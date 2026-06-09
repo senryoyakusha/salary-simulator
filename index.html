@@ -51,7 +51,6 @@
       text-transform: uppercase;
     }
 
-    /* タブ切り替えコンテナ */
     .tab-container {
       display: flex;
       gap: 8px;
@@ -74,7 +73,6 @@
       color: #000;
       border-color: var(--gold);
     }
-    /* 店舗管理者タブ（デフォルト非表示、権限持ちのみJSで表示） */
     #tab-btn-manager {
       display: none;
     }
@@ -256,6 +254,11 @@
       <input type="number" id="val-store-sales" value="4500000">
     </div>
 
+    <div class="form-group" id="group-staff-count" style="display: none;">
+      <label>スタッフ数 (人)</label>
+      <input type="number" id="val-staff-count" value="5">
+    </div>
+
     <div class="form-group" id="group-my-sales" style="display: none;">
       <label>自身の売上 (F52用) (円)</label>
       <input type="number" id="val-my-sales" value="800000">
@@ -300,15 +303,12 @@
 </div>
 
 <script>
-  // ==========================================
-  // ⚙️ 固有設定エリア
-  // ==========================================
   const GAS_URL = "https://script.google.com/macros/s/AKfycbwBvIo3dwUlJxokcDr2KQjJ2w4RcqkOFjwt1Hlnq4YBDKGooxtnwqz2xOUKdPptwSIg/exec"; 
-  const LIFF_ID = "2010338156-BlUG050h"; // URLではなく「IDのみ」に修正済み
+  const LIFF_ID = "2010338156-BlUG050h"; 
 
   let currentType = '委託';
   let userLineId = "";
-  let hasManagerAccess = false; // 管理者タブのアクセス権限フラグ
+  let hasManagerAccess = false; 
 
   window.onload = function() {
     liff.init({ liffId: LIFF_ID })
@@ -325,7 +325,6 @@
       .catch(err => { console.error("LIFF Init Error", err); });
   };
 
-  // 1. 権限照合（M列の○判定を裏のGASから取得）
   async function checkUserAuthority(userId) {
     try {
       const response = await fetch(`${GAS_URL}?action=checkAuth&userId=${userId}`);
@@ -337,14 +336,13 @@
         document.getElementById('main-app').style.display = 'block'; 
         document.getElementById('welcome-title').innerText = `${result.userName} 試算システム`;
         
-        // M列に◯がある場合のみ、管理者タブを画面上に出現させる
         if (result.isManager) {
           hasManagerAccess = true;
           document.getElementById('tab-btn-manager').style.display = 'block';
-          setupSwipeGesture(); // スワイプジェスチャーの有効化
+          setupSwipeGesture(); 
         }
         
-        calcRealtime(); // 初回リアルタイム計算
+        calcRealtime(); 
       } else {
         document.getElementById('auth-error').style.display = 'block'; 
       }
@@ -354,19 +352,18 @@
     }
   }
 
-  // 2. タブ切り替えと入力欄の出し分け
   function switchType(type) {
     currentType = type;
     
-    // タブの「選択中」デザイン切り替え
     document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
     if (type === '委託') document.getElementById('tab-btn-contract').classList.add('active');
     if (type === '正社員') document.getElementById('tab-btn-regular').classList.add('active');
     if (type === '管理者') document.getElementById('tab-btn-manager').classList.add('active');
 
-    // 表示エリアの完全制御
+    // 出し分け制御
     document.getElementById('group-store-select').style.display  = (type === '管理者') ? 'block' : 'none';
     document.getElementById('group-store-sales').style.display   = (type === '管理者') ? 'block' : 'none';
+    document.getElementById('group-staff-count').style.display   = (type === '管理者') ? 'block' : 'none';
     document.getElementById('group-my-sales').style.display      = (type === '管理者') ? 'block' : 'none';
     document.getElementById('btn-calc-manager').style.display    = (type === '管理者') ? 'block' : 'none';
 
@@ -384,10 +381,9 @@
     calcRealtime();
   }
 
-  // 3. 【不備修正】入力フォーム変更時に即座に連動するリアルタイムロジック
   function calcRealtime() {
     if (currentType === '管理者') {
-      document.getElementById('result-box').innerHTML = `<p style="color:var(--text-sub); font-size:0.85rem; text-align:center;">「店舗利益を連動して計算」ボタンを押すと、Googleスプレッドシートの数式とリアルタイム同期して計算結果が表示されます。</p>`;
+      document.getElementById('result-box').innerHTML = `<p style="color:var(--text-sub); font-size:0.85rem; text-align:center;">「店舗利益を連動して計算」ボタンを押すと、スプレッドシートの数式と連動した計算結果が表示されます。</p>`;
       return; 
     }
 
@@ -428,7 +424,7 @@
         <div class="result-row"><span class="result-label">店販報酬 (10%)</span><span class="result-val">¥${rTenba.toLocaleString()}</span></div>
         <div class="result-row"><span class="result-label">作業時間手当 (¥1,500/h)</span><span class="result-val">¥${rTask.toLocaleString()}</span></div>
         <div class="result-row"><span class="result-label">係手当</span><span class="result-val">¥${rKakei.toLocaleString()}</span></div>
-        <div class="result-row"><span class="result-label">交通費 (稼働連動上限)</span><span class="result-val">¥${rTraffic.toLocaleString()}</span></div>
+        <div class="result-row"><span class="result-label">交通費</span><span class="result-val">¥${rTraffic.toLocaleString()}</span></div>
         <div class="result-row"><span class="result-label">支給見込み総額</span><span class="result-val total">¥${total.toLocaleString()}</span></div>
       `;
     } 
@@ -469,10 +465,11 @@
     document.getElementById('result-box').innerHTML = html;
   }
 
-  // 4. 管理者専用：スプレッドシート間連動処理
+  // 店舗管理者のスプシ連動通信
   function calcManagerWithSpreadsheet() {
     const store = document.getElementById('val-store-select').value;
-    const storeSales = document.getElementById('val-store-sales').value;
+    const storeSales = Number(document.getElementById('val-store-sales').value) || 0;
+    const staffCount = Number(document.getElementById('val-staff-count').value) || 1;
     const mySales = document.getElementById('val-my-sales').value; 
 
     document.getElementById('loading').style.display = 'block';
@@ -484,13 +481,17 @@
         document.getElementById('loading').style.display = 'none';
         
         if (data.status === 'success') {
-          const finalSalary = Math.max(data.calculatedSalary, 400000); 
+          // 四捨五入(Math.round)の適用 ＋ 40万円最低保証の適用
+          const finalProfit = Math.round(data.storeProfit);
+          const finalSalary = Math.max(Math.round(data.calculatedSalary), 400000);
+          
+          // 💡 生産性計算（売上 ÷ スタッフ数、四捨五入）
+          const productivity = Math.round(storeSales / staffCount);
 
           document.getElementById('result-box').innerHTML = `
-            <div class="result-row"><span class="result-label">対象店舗利益 (C51値)</span><span class="result-val">¥${data.storeProfit.toLocaleString()}</span></div>
-            <div class="result-row"><span class="result-label">スプシ計算歩合 (C53値)</span><span class="result-val">¥${data.calculatedSalary.toLocaleString()}</span></div>
-            <div class="result-row"><span class="result-label">最低保証判定</span><span class="result-val">${data.calculatedSalary < 400000 ? '最低保証適用 (40万)' : '歩合適用'}</span></div>
-            <div class="result-row"><span class="result-label">支給見込み総額</span><span class="result-val total">¥${finalSalary.toLocaleString()}</span></div>
+            <div class="result-row"><span class="result-label">対象店舗利益</span><span class="result-val">¥${finalProfit.toLocaleString()}</span></div>
+            <div class="result-row"><span class="result-label">生産性(目安)</span><span class="result-val">¥${productivity.toLocaleString()}</span></div>
+            <div class="result-row"><span class="result-label">支給見込み額</span><span class="result-val total">¥${finalSalary.toLocaleString()}</span></div>
           `;
         } else {
           document.getElementById('result-box').innerHTML = `<p style="color:red;">エラー: ${data.message}</p>`;
@@ -502,7 +503,6 @@
       });
   }
 
-  // 5. ダッシュボード風の横スワイプ判定ロジック
   function setupSwipeGesture() {
     let touchstartX = 0;
     let touchendX = 0;
@@ -521,15 +521,12 @@
       const swipeDistance = touchendX - touchstartX;
       let idx = types.indexOf(currentType);
       
-      if (Math.abs(swipeDistance) > 60) { // 60px以上のスワイプで判定
+      if (Math.abs(swipeDistance) > 60) {
         if (swipeDistance < 0) {
-          // 左スワイプ（次へ進む）
           idx++;
-          // 管理者権限がない場合は「正社員」でストップさせる
           if (!hasManagerAccess && idx > 1) idx = 1;
           if (idx >= types.length) idx = types.length - 1;
         } else {
-          // 右スワイプ（前へ戻る）
           idx--;
           if (idx < 0) idx = 0;
         }
