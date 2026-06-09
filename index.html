@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>給与シミュレーター</title>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;700&display=swap" rel="stylesheet">
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
   <style>
     :root {
       --bg: #121212;
@@ -30,10 +31,12 @@
       justify-content: center;
     }
 
+    /* メインコンテナ（最初は非表示にして部外者への露出を防ぐ） */
     .container {
       width: 100%;
       max-width: 500px;
       padding-bottom: 50px;
+      display: none;
     }
 
     /* ヘッダー */
@@ -159,12 +162,7 @@
       color: var(--gold);
     }
 
-    /* ローディング（シンプルなくるくる） */
-    #loading {
-      display: none;
-      text-align: center;
-      padding: 20px 0;
-    }
+    /* ローディング・スピナー */
     .spinner {
       width: 30px;
       height: 30px;
@@ -178,17 +176,47 @@
       0% { transform: rotate(0deg); }
       100% { transform: rotate(360deg); }
     }
+
+    #loading {
+      display: none;
+      text-align: center;
+      padding: 20px 0;
+    }
     #loading p {
       font-size: 0.8rem;
       color: var(--gold);
+    }
+
+    /* 認証・権限エラー画面 */
+    #checking-auth {
+      text-align: center;
+      margin-top: 100px;
+      color: var(--gold);
+    }
+    #auth-error {
+      display: none;
+      text-align: center;
+      margin-top: 100px;
+      color: #ff4444;
+      font-size: 1.1rem;
+      font-weight: bold;
     }
   </style>
 </head>
 <body>
 
-<div class="container">
+<div id="checking-auth">
+  <div class="spinner"></div>
+  <p>ユーザー権限を確認中...</p>
+</div>
+
+<div id="auth-error">
+  <p>🔒 アクセス権限がありません。<br><span style="font-size:0.85rem; font-weight:normal; color:#aaa;">スタッフマスタにLINEの連携登録が必要です。</span></p>
+</div>
+
+<div class="container" id="main-app">
   <div class="header">
-    <h1>Salary Simulator</h1>
+    <h1 id="welcome-title">Salary Simulator</h1>
   </div>
 
   <div class="tab-container">
@@ -265,22 +293,65 @@
 
   <div class="card">
     <div class="card-title">給与支給見込み（試算結果）</div>
-    <div id="result-box">
-      </div>
+    <div id="result-box"></div>
   </div>
 </div>
 
 <script>
-  let currentType = '委託';
-  const GAS_URL = "https://script.google.com/macros/s/AKfycbwBvIo3dwUlJxokcDr2KQjJ2w4RcqkOFjwt1Hlnq4YBDKGooxtnwqz2xOUKdPptwSIg/exec"; // 後ほどGASをデプロイしたURLを貼ります
+  // ==========================================
+  // ⚙️ 固有設定エリア（ご自身の情報に書き換えてください）
+  // ==========================================
+  const GAS_URL = "https://script.google.com/macros/s/AKfycbwBvIo3dwUlJxokcDr2KQjJ2w4RcqkOFjwt1Hlnq4YBDKGooxtnwqz2xOUKdPptwSIg/exec"; // デプロイして取得したGASのURL（末尾が/execのもの）
+  const LIFF_ID = "2010338156-BlUG050h";         // LINEログインチャネルのLIFFタブで発行されたID
 
-  // タブ切り替え
+  let currentType = '委託';
+  let userLineId = "";
+
+  // 1. アプリ起動時の初期化処理
+  window.onload = function() {
+    liff.init({ liffId: LIFF_ID })
+      .then(() => {
+        if (!liff.isLoggedIn()) {
+          liff.login(); // 未ログイン時はLINEログイン画面を自動強制
+        } else {
+          liff.getProfile().then(profile => {
+            userLineId = profile.userId; // LINE内固有のUserIDを取得
+            checkUserAuthority(userLineId); // マスタ照合処理へ
+          });
+        }
+      })
+      .catch(err => { console.error("LIFF Init Error", err); });
+  };
+
+  // 2. スタッフマスタ（GAS経由）でのアクセス権限チェック
+  async function checkUserAuthority(userId) {
+    try {
+      const response = await fetch(`${GAS_URL}?action=checkAuth&userId=${userId}`);
+      const result = await response.json();
+      
+      document.getElementById('checking-auth').style.display = 'none'; // ロード表示を消す
+      
+      if (result.status === 'success' && result.isAllowed) {
+        // マスタに登録がある正規のスタッフのみ画面を開放
+        document.getElementById('main-app').style.display = 'block'; 
+        document.getElementById('welcome-title').innerText = `${result.userName} 試算システム`;
+        calcRealtime(); // 初期計算を実行
+      } else {
+        // 登録がない部外者はエラー画面を表示して永久ロック
+        document.getElementById('auth-error').style.display = 'block'; 
+      }
+    } catch (e) {
+      document.getElementById('checking-auth').style.display = 'none';
+      document.getElementById('auth-error').style.display = 'block';
+    }
+  }
+
+  // 3. タブ切り替え制御
   function switchType(type) {
     currentType = type;
     document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
     event.target.classList.add('active');
 
-    // 画面の入力サジェストを切り替え
     document.getElementById('store-group').style.display = (type === '管理者') ? 'block' : 'none';
     document.getElementById('grade-group').style.display = (type === '正社員') ? 'block' : 'none';
     document.getElementById('input-store-sales').style.display = (type === '管理者') ? 'block' : 'none';
@@ -289,7 +360,6 @@
     document.getElementById('input-total-hours').style.display = (type === '正社員') ? 'block' : 'none';
     document.getElementById('btn-calc-manager').style.display = (type === '管理者') ? 'block' : 'none';
     
-    // 管理者のときは自身の売上＝店舗売上の入力欄にするためラベル調整
     if(type === '管理者') {
       document.getElementById('input-shimei').style.display = 'none';
       document.getElementById('input-free').style.display = 'none';
@@ -308,9 +378,9 @@
     calcRealtime();
   }
 
-  // 【時差0秒】業務委託・正社員のリアルタイム計算ロジック
+  // 4. 【時差0秒】業務委託・正社員用のリアルタイムロジック
   function calcRealtime() {
-    if (currentType === '管理者') return; // 管理者はボタンを押すまでスキップ
+    if (currentType === '管理者') return; 
 
     const shimei = Number(document.getElementById('val-shimei').value) || 0;
     const free = Number(document.getElementById('val-free').value) || 0;
@@ -324,24 +394,20 @@
       const hours = Number(document.getElementById('val-work-hours').value) || 0;
       const taskHours = Number(document.getElementById('val-task-hours').value) || 0;
 
-      // 各種歩合・手当の計算
       const rShimei = Math.floor(shimei * 0.5);
       const rFree = Math.floor(free * 0.4);
       
-      // ボーナス
       const bonusBase = (shimei + free) - 1000000;
       const rBonus = bonusBase > 0 ? Math.floor(bonusBase * 0.2) : 0;
       
       const rTenba = Math.floor(tenba * 0.1);
       const rTask = Math.floor(taskHours * 1500);
 
-      // 交通費上限判定
       let rTraffic = 0;
       if (hours > 200) rTraffic = Math.min(traffic, 22000);
       else if (hours > 150) rTraffic = Math.min(traffic, 11000);
       else if (hours > 100) rTraffic = Math.min(traffic, 5500);
 
-      // 係報酬（仮で一律10,000円、本来はマスタ連動）
       const rKakei = 10000; 
 
       total = rShimei + rFree + rBonus + rTenba + rTask + rTraffic + rKakei;
@@ -352,8 +418,8 @@
         <div class="result-row"><span class="result-label">ボーナス報酬 (超過20%)</span><span class="result-val">¥${rBonus.toLocaleString()}</span></div>
         <div class="result-row"><span class="result-label">店販報酬 (10%)</span><span class="result-val">¥${rTenba.toLocaleString()}</span></div>
         <div class="result-row"><span class="result-label">作業時間手当 (¥1,500/h)</span><span class="result-val">¥${rTask.toLocaleString()}</span></div>
-        <div class="result-row"><span class="result-label">係手当 (マスタ連動)</span><span class="result-val">¥${rKakei.toLocaleString()}</span></div>
-        <div class="result-row"><span class="result-label">交通費 (稼働時間連動上限)</span><span class="result-val">¥${rTraffic.toLocaleString()}</span></div>
+        <div class="result-row"><span class="result-label">係手当</span><span class="result-val">¥${rKakei.toLocaleString()}</span></div>
+        <div class="result-row"><span class="result-label">交通費 (稼働連動上限)</span><span class="result-val">¥${rTraffic.toLocaleString()}</span></div>
         <div class="result-row"><span class="result-label">支給見込み総額</span><span class="result-val total">¥${total.toLocaleString()}</span></div>
       `;
     } 
@@ -361,33 +427,22 @@
       const grade = document.getElementById('emp-grade').value;
       const totalHours = Number(document.getElementById('val-total-hours').value) || 0;
 
-      // 基本給マッピング
       let basePay = 230700;
       if (grade === 'assistant') basePay = 213000;
       if (grade === 'jr-stylist') basePay = 215700;
 
-      // 残業代計算
       const overtime = totalHours - 177;
       const rOvertime = overtime > 0 ? Math.floor(overtime * 1625) : 0;
-
-      // 交通費上限
       const rTraffic = Math.min(traffic, 20000);
-
-      // 店販
       const rTenba = Math.floor(tenba * 0.1);
 
-      // 複雑な売上按分報酬
       let rSalesPay = 0;
       const techTotal = shimei + free;
       if (techTotal > 550000) {
         const overSales = techTotal - 550000;
         const shimeiRate = shimei / techTotal;
         const freeRate = free / techTotal;
-
-        const shimeiOver = overSales * shimeiRate;
-        const freeOver = overSales * freeRate;
-
-        rSalesPay = Math.floor((shimeiOver * 0.4) + (freeOver * 0.2));
+        rSalesPay = Math.floor((overSales * shimeiRate * 0.4) + (overSales * freeRate * 0.2));
       }
 
       total = basePay + rOvertime + rTraffic + rTenba + rSalesPay;
@@ -405,25 +460,23 @@
     document.getElementById('result-box').innerHTML = html;
   }
 
-  // 【時差2秒・ボタン式】店舗管理者のスプシ連動通信
+  // 5. 【時差2秒・ボタン式】管理者のスプシ連動通信
   function calcManagerWithSpreadsheet() {
     const store = document.getElementById('store-select').value;
     const storeSales = document.getElementById('val-store-sales').value;
-    const mySales = document.getElementById('val-free').value; // 管理者時は「自身の売上」に化けている入力欄
+    const mySales = document.getElementById('val-free').value; 
 
-    // 上品なくるくるローディング開始
     document.getElementById('loading').style.display = 'block';
     document.getElementById('result-box').innerHTML = "";
 
-    // GASへ数値を送信
-    fetch(`${GAS_URL}?store=${store}&storeSales=${storeSales}&mySales=${mySales}`)
+    // アクションパラメータとして"simulate"を付与してリクエスト
+    fetch(`${GAS_URL}?action=simulate&store=${store}&storeSales=${storeSales}&mySales=${mySales}`)
       .then(res => res.json())
       .then(data => {
         document.getElementById('loading').style.display = 'none';
         
         if (data.status === 'success') {
-          // 最低保証40万のロジック
-          const finalSalary = Math.max(data.calculatedSalary, 400000);
+          const finalSalary = Math.max(data.calculatedSalary, 400000); // 最低保証40万判定
 
           document.getElementById('result-box').innerHTML = `
             <div class="result-row"><span class="result-label">対象店舗利益 (C51値)</span><span class="result-val">¥${data.storeProfit.toLocaleString()}</span></div>
@@ -440,9 +493,6 @@
         document.getElementById('result-box').innerHTML = `<p style="color:red;">通信エラーが発生しました</p>`;
       });
   }
-
-  // 初回起動時の計算実行
-  window.onload = () => { calcRealtime(); };
 </script>
 </body>
 </html>
