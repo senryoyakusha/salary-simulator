@@ -210,7 +210,7 @@
 
 <div class="container" id="main-app">
   <div class="header">
-    <h1 id="welcome-title">Salary Simulator</h1>
+    <h1 id="welcome-title">給与シミュレーター</h1>
   </div>
 
   <div class="tab-container">
@@ -241,51 +241,51 @@
 
     <div class="form-group" id="group-shimei">
       <label>指名技術売上 (円)</label>
-      <input type="number" id="val-shimei" value="600000" oninput="calcRealtime()">
+      <input type="number" id="val-shimei" value="0" oninput="calcRealtime()">
     </div>
 
     <div class="form-group" id="group-free">
       <label>フリー技術売上 (円)</label>
-      <input type="number" id="val-free" value="200000" oninput="calcRealtime()">
+      <input type="number" id="val-free" value="0" oninput="calcRealtime()">
     </div>
 
     <div class="form-group" id="group-staff-count" style="display: none;">
       <label>スタッフ数 (人)</label>
-      <input type="number" id="val-staff-count" value="5">
+      <input type="number" id="val-staff-count" value="0">
     </div>
     
     <div class="form-group" id="group-store-sales" style="display: none;">
       <label>店舗総売上 (円)</label>
-      <input type="number" id="val-store-sales" value="4500000">
+      <input type="number" id="val-store-sales" value="0">
     </div>
 
     <div class="form-group" id="group-my-sales" style="display: none;">
       <label>自身の売上 (円)</label>
-      <input type="number" id="val-my-sales" value="800000">
+      <input type="number" id="val-my-sales" value="0">
     </div>
 
     <div class="form-group" id="group-tenba">
       <label>店販売上 (円)</label>
-      <input type="number" id="val-tenba" value="30000" oninput="calcRealtime()">
+      <input type="number" id="val-tenba" value="0" oninput="calcRealtime()">
     </div>
 
     <div class="form-group" id="group-work-hours">
       <label>稼働時間 (時間)</label>
-      <input type="number" id="val-work-hours" value="160" oninput="calcRealtime()">
+      <input type="number" id="val-work-hours" value="0" oninput="calcRealtime()">
     </div>
     <div class="form-group" id="group-task-hours">
       <label>作業時間 (時間・0.5刻み)</label>
-      <input type="number" id="val-task-hours" step="0.5" value="10" oninput="calcRealtime()">
+      <input type="number" id="val-task-hours" step="0.5" value="0" oninput="calcRealtime()">
     </div>
 
     <div class="form-group" id="group-total-hours" style="display: none;">
       <label>総労働時間 (時間)</label>
-      <input type="number" id="val-total-hours" value="180" oninput="calcRealtime()">
+      <input type="number" id="val-total-hours" value="0" oninput="calcRealtime()">
     </div>
 
     <div class="form-group" id="group-traffic">
       <label>交通費申請額 (円)</label>
-      <input type="number" id="val-traffic" value="10000" oninput="calcRealtime()">
+      <input type="number" id="val-traffic" value="0" oninput="calcRealtime()">
     </div>
 
     <button class="calc-btn" id="btn-calc-manager" style="display: none;" onclick="calcManagerWithSpreadsheet()">店舗利益を連動して計算</button>
@@ -309,7 +309,7 @@
   let currentType = '委託';
   let userLineId = "";
   let hasManagerAccess = false; 
-  let myKakeiAllowance = 0; // マスタから自動計算された係手当
+  let myKakeiAllowance = 0; 
 
   window.onload = function() {
     liff.init({ liffId: LIFF_ID })
@@ -335,7 +335,6 @@
       
       if (result.status === 'success' && result.isAllowed) {
         document.getElementById('main-app').style.display = 'block'; 
-        document.getElementById('welcome-title').innerText = `${result.userName} 試算システム`;
         
         // マスタから自動算出された係手当の総額をキープ
         myKakeiAllowance = Number(result.kakeiAllowance) || 0;
@@ -412,12 +411,19 @@
       const rTenba = Math.floor(tenba * 0.1);
       const rTask = Math.floor(taskHours * 1500);
 
+      // ⭕️ 交通費支給判定（0.5時間刻み対応）
       let rTraffic = 0;
-      if (hours > 200) rTraffic = Math.min(traffic, 22000);
-      else if (hours > 150) rTraffic = Math.min(traffic, 11000);
-      else if (hours > 100) rTraffic = Math.min(traffic, 5500);
+      if (hours >= 200) {
+        rTraffic = Math.min(traffic, 22000);
+      } else if (hours >= 150) {
+        rTraffic = Math.min(traffic, 11000);
+      } else if (hours >= 100) {
+        rTraffic = Math.min(traffic, 5500);
+      } else {
+        rTraffic = 0;
+      }
 
-      const rKakei = myKakeiAllowance; // マスタ連動値
+      const rKakei = myKakeiAllowance; 
 
       total = rShimei + rFree + rBonus + rTenba + rTask + rTraffic + rKakei;
 
@@ -427,7 +433,7 @@
         <div class="result-row"><span class="result-label">ボーナス報酬 (超過20%)</span><span class="result-val">¥${rBonus.toLocaleString()}</span></div>
         <div class="result-row"><span class="result-label">店販報酬 (10%)</span><span class="result-val">¥${rTenba.toLocaleString()}</span></div>
         <div class="result-row"><span class="result-label">作業時間手当 (¥1,500/h)</span><span class="result-val">¥${rTask.toLocaleString()}</span></div>
-        <div class="result-row"><span class="result-label">係手当 (マスタ連動)</span><span class="result-val">¥${rKakei.toLocaleString()}</span></div>
+        <div class="result-row"><span class="result-label">係手当</span><span class="result-val">¥${rKakei.toLocaleString()}</span></div>
         <div class="result-row"><span class="result-label">交通費</span><span class="result-val">¥${rTraffic.toLocaleString()}</span></div>
         <div class="result-row"><span class="result-label">支給見込み総額</span><span class="result-val total">¥${total.toLocaleString()}</span></div>
       `;
@@ -461,7 +467,7 @@
         <div class="result-row"><span class="result-label">残業手当 (177h超分)</span><span class="result-val">¥${rOvertime.toLocaleString()}</span></div>
         <div class="result-row"><span class="result-label">売上按分報酬 (閾値55万)</span><span class="result-val">¥${rSalesPay.toLocaleString()}</span></div>
         <div class="result-row"><span class="result-label">店販報酬 (10%)</span><span class="result-val">¥${rTenba.toLocaleString()}</span></div>
-        <div class="result-row"><span class="result-label">係手当 (マスタ連動)</span><span class="result-val">¥${myKakeiAllowance.toLocaleString()}</span></div>
+        <div class="result-row"><span class="result-label">係手当</span><span class="result-val">¥${myKakeiAllowance.toLocaleString()}</span></div>
         <div class="result-row"><span class="result-label">交通費 (上限2万)</span><span class="result-val">¥${rTraffic.toLocaleString()}</span></div>
         <div class="result-row"><span class="result-label">支給見込み総額</span><span class="result-val total">¥${total.toLocaleString()}</span></div>
       `;
@@ -470,7 +476,6 @@
     document.getElementById('result-box').innerHTML = html;
   }
 
-  // 店舗管理者のスプシ連動通信
   function calcManagerWithSpreadsheet() {
     const store = document.getElementById('val-store-select').value;
     const storeSales = Number(document.getElementById('val-store-sales').value) || 0;
@@ -490,7 +495,6 @@
           const finalSalary = Math.max(Math.round(data.calculatedSalary), 400000);
           const productivity = Math.round(storeSales / staffCount);
 
-          // あなたが調整してくれた完璧な並び順
           document.getElementById('result-box').innerHTML = `
             <div class="result-row"><span class="result-label">生産性(目安)</span><span class="result-val">¥${productivity.toLocaleString()}</span></div>
             <div class="result-row"><span class="result-label">対象店舗利益</span><span class="result-val">¥${finalProfit.toLocaleString()}</span></div>
