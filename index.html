@@ -309,6 +309,7 @@
   let currentType = '委託';
   let userLineId = "";
   let hasManagerAccess = false; 
+  let myKakeiAllowance = 0; // マスタから自動計算された係手当
 
   window.onload = function() {
     liff.init({ liffId: LIFF_ID })
@@ -335,6 +336,9 @@
       if (result.status === 'success' && result.isAllowed) {
         document.getElementById('main-app').style.display = 'block'; 
         document.getElementById('welcome-title').innerText = `${result.userName} 試算システム`;
+        
+        // マスタから自動算出された係手当の総額をキープ
+        myKakeiAllowance = Number(result.kakeiAllowance) || 0;
         
         if (result.isManager) {
           hasManagerAccess = true;
@@ -413,7 +417,7 @@
       else if (hours > 150) rTraffic = Math.min(traffic, 11000);
       else if (hours > 100) rTraffic = Math.min(traffic, 5500);
 
-      const rKakei = 10000; 
+      const rKakei = myKakeiAllowance; // マスタ連動値
 
       total = rShimei + rFree + rBonus + rTenba + rTask + rTraffic + rKakei;
 
@@ -423,7 +427,7 @@
         <div class="result-row"><span class="result-label">ボーナス報酬 (超過20%)</span><span class="result-val">¥${rBonus.toLocaleString()}</span></div>
         <div class="result-row"><span class="result-label">店販報酬 (10%)</span><span class="result-val">¥${rTenba.toLocaleString()}</span></div>
         <div class="result-row"><span class="result-label">作業時間手当 (¥1,500/h)</span><span class="result-val">¥${rTask.toLocaleString()}</span></div>
-        <div class="result-row"><span class="result-label">係手当</span><span class="result-val">¥${rKakei.toLocaleString()}</span></div>
+        <div class="result-row"><span class="result-label">係手当 (マスタ連動)</span><span class="result-val">¥${rKakei.toLocaleString()}</span></div>
         <div class="result-row"><span class="result-label">交通費</span><span class="result-val">¥${rTraffic.toLocaleString()}</span></div>
         <div class="result-row"><span class="result-label">支給見込み総額</span><span class="result-val total">¥${total.toLocaleString()}</span></div>
       `;
@@ -450,13 +454,14 @@
         rSalesPay = Math.floor((overSales * shimeiRate * 0.4) + (overSales * freeRate * 0.2));
       }
 
-      total = basePay + rOvertime + rTraffic + rTenba + rSalesPay;
+      total = basePay + rOvertime + rTraffic + rTenba + rSalesPay + myKakeiAllowance;
 
       html = `
         <div class="result-row"><span class="result-label">基本給</span><span class="result-val">¥${basePay.toLocaleString()}</span></div>
         <div class="result-row"><span class="result-label">残業手当 (177h超分)</span><span class="result-val">¥${rOvertime.toLocaleString()}</span></div>
         <div class="result-row"><span class="result-label">売上按分報酬 (閾値55万)</span><span class="result-val">¥${rSalesPay.toLocaleString()}</span></div>
         <div class="result-row"><span class="result-label">店販報酬 (10%)</span><span class="result-val">¥${rTenba.toLocaleString()}</span></div>
+        <div class="result-row"><span class="result-label">係手当 (マスタ連動)</span><span class="result-val">¥${myKakeiAllowance.toLocaleString()}</span></div>
         <div class="result-row"><span class="result-label">交通費 (上限2万)</span><span class="result-val">¥${rTraffic.toLocaleString()}</span></div>
         <div class="result-row"><span class="result-label">支給見込み総額</span><span class="result-val total">¥${total.toLocaleString()}</span></div>
       `;
@@ -481,13 +486,11 @@
         document.getElementById('loading').style.display = 'none';
         
         if (data.status === 'success') {
-          // 四捨五入(Math.round)の適用 ＋ 40万円最低保証の適用
           const finalProfit = Math.round(data.storeProfit);
           const finalSalary = Math.max(Math.round(data.calculatedSalary), 400000);
-          
-          // 💡 生産性計算（売上 ÷ スタッフ数、四捨五入）
           const productivity = Math.round(storeSales / staffCount);
 
+          // あなたが調整してくれた完璧な並び順
           document.getElementById('result-box').innerHTML = `
             <div class="result-row"><span class="result-label">生産性(目安)</span><span class="result-val">¥${productivity.toLocaleString()}</span></div>
             <div class="result-row"><span class="result-label">対象店舗利益</span><span class="result-val">¥${finalProfit.toLocaleString()}</span></div>
