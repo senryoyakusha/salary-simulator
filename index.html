@@ -260,7 +260,7 @@
     </div>
 
     <div class="form-group" id="group-my-sales" style="display: none;">
-      <label>自身の売上 (F52用) (円)</label>
+      <label>自身の売上 (円)</label>
       <input type="number" id="val-my-sales" value="800000">
     </div>
 
@@ -489,8 +489,8 @@
           const productivity = Math.round(storeSales / staffCount);
 
           document.getElementById('result-box').innerHTML = `
-            <div class="result-row"><span class="result-label">対象店舗利益</span><span class="result-val">¥${finalProfit.toLocaleString()}</span></div>
             <div class="result-row"><span class="result-label">生産性(目安)</span><span class="result-val">¥${productivity.toLocaleString()}</span></div>
+            <div class="result-row"><span class="result-label">対象店舗利益</span><span class="result-val">¥${finalProfit.toLocaleString()}</span></div>
             <div class="result-row"><span class="result-label">支給見込み額</span><span class="result-val total">¥${finalSalary.toLocaleString()}</span></div>
           `;
         } else {
